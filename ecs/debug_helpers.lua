@@ -34,3 +34,9 @@ function printTable(t, ...)
       print("}")
     end
 end
+
+table.pack = function (...)
+    local t = { ... }
+    t.n = select('#', ...)
+    return t
+end

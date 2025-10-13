@@ -23,6 +23,10 @@ function get_entity_count()
   return e:get_entity_count()
 end
 
+function get_free_entities()
+  return e:get_free_entities()
+end
+
 function set_entity_max(new_max)
   e:set_entity_max(new_max)
 end
@@ -68,34 +72,28 @@ end
 
 function after_system(func, ...)
   if s:get_system_flag() == nil then
-    love.errorhandler("Cannot call after_system while not in a system")
-    love.event.quit(0)
-  elseif type(func) ~= "function" then
-    love.errorhandler("Argument 1 given to after_system was not a function, but a "..type(func))
-    love.event.quit(0)
+    error("Cannot call after_system while not in a system", 2)
   else
-    local args = {...} 
-    s:call_after_system(func, args)
+    local call_line = debug.getinfo(2, "Sl")
+    local args = {...}
+    s:call_after_system(func, args, call_line)
   end
 end
 
 function before_next_system(func, ...)
-  if type(func) ~= "function" then
-    love.errorhandler("Argument 1 given to before_next_system was not a function, but a "..type(func))
-    love.event.quit(0)
-  end
+  local call_line = debug.getinfo(2, "Sl")
   local args = {...}
-  s:call_before_system(func, unpack(args))
+  s:call_before_system(func, args, call_line)
 end
 
 function new_component_type(...)
-  local args = {...}
-  return c:new_component_type(unpack(args))
+  local args = table.pack(...)
+  return c:new_component_type(args)
 end
 
 function new_component_type_with_transform(...)
   local args = {...}
-  return c:new_component_type_with_transform(unpack(args))
+  return c:new_component_type_with_transform(args)
 end
 
 function add_component(entity_id, component_id, ...)
@@ -105,11 +103,12 @@ function add_component(entity_id, component_id, ...)
     array[entity_id] = true
   end
   
-  return c:add_component(entity_id, component_id, update_entity_signature, unpack(args))
+  return c:add_component(entity_id, component_id, update_entity_signature, args)
 end
+
 function new_system(...)
   local args = {...}
-  return s:new_system(get_entity_signature, get_max_components(), get_component, unpack(args))
+  return s:new_system(get_entity_signature, get_max_components(), get_component, args)
 end
 
 function print_ecs()
@@ -132,6 +131,7 @@ function print_entity(entity_id)
   e:print_entity(entity_id)
 end
 
-function components(component_id)
-  return c:ititerate_component(component_id)
+function components(component_id, ...)
+  local args = {...}
+  return c:ititerate_component(component_id, args)
 end

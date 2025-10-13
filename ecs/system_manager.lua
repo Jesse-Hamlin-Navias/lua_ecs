@@ -25,18 +25,31 @@ function system_manager:delete_after_system(func, args)
 end
 --
 --adds a function and its args to after_system_array
-function system_manager:call_after_system(func, args)
-  table.insert(after_system_array, {func, args})
+function system_manager:call_after_system(func, args, call_line)
+  if type(func) ~= "function" then
+    error("after_system(): argument 1 expected function but got "..type(func), 3)
+  elseif debug.getinfo(func, "u").nparams > #args then
+    error("after_system(): argument 1 function takes "..tostring(debug.getinfo(func, "u").nparams).." argument but was given "..tostring(#args), 3)
+  end
+  table.insert(after_system_array, {func, args, call_line})
 end
 --
 --adds a function and its args to the before_system_array
-function system_manager:call_before_system(func, ...)
-  local args = {...}
-  table.insert(before_system_array, {func, args})
+function system_manager:call_before_system(func, args, call_line)
+  if type(func) ~= "function" then
+    error("before_next_system(): argument 1 expected function but got "..type(func), 3)
+  elseif debug.getinfo(func, "u").nparams > #args then
+    error("before_next_system(): argument 1 function takes "..tostring(debug.getinfo(func, "u").nparams).." argument but was given "..tostring(#args), 3)
+  end
+  table.insert(before_system_array, {func, args, call_line})
 end
 --
 --Prints the system info with system ID i
 function system_manager:print_system(i)
+  local system_print_array = systems_print_array[i]
+  if system_print_array == nil then
+    error("print_system(): argument 1 expected system_id but got "..tostring(i), 3)
+  end
   print("System "..tostring(i)..":")
   for key, value in pairs(systems_print_array[i]) do
     io.write(key..":")
@@ -56,12 +69,30 @@ function system_manager:print_all_systems()
   end
 end
 --
+local function no_repeats(a)
+  for i=1, #a-1 do
+    local v = a[i]
+    for j=i+1, #a do
+      if math.abs(v) == math.abs(a[j]) then return false end
+    end
+  end
+  return true
+end
+
+--
 --Returns a table of boolean functions that is used to test entity-component-flags
 --Takes a hash of components->num and the #component_types,
 local function compose_signature(components, max_components)
   local signature = {}
+  if not no_repeats(components) then error("new_system(): argument 1 signature_tables cannot have repeat component_ids", 3) end
   for i, component_id in ipairs(components) do
     --if a component_type is listed in components, and is set as -1,
+
+    if type(component_id) ~= "number" or math.abs(component_id) > max_components or 
+    component_id==0 or math.floor(component_id) ~= component_id then
+      error("new_system() argument 1, entry "..tostring(i)..", expected component_id but got "..tostring(component_id), 3)
+    end
+    
     if component_id<0 then
       --then create a boolean function that inverts its boolean input
       table.insert(signature, component_id*-1, 
@@ -80,9 +111,8 @@ end
 --Apply a systems function (func) onto an entity + extra arguments, where input_components is a table of
 --each component that is needed by func and owned by that entity, and ... is other required arguments
 --Only called inside new_system's closure
-local function apply_system_to_entity(func, input_components, ...)
+local function apply_system_to_entity(func, input_components, args)
   --This concatonates input_components followed by all other arguments into one table
-  local args={...}
   local grabbed_components = {}
   for i, component in ipairs(input_components) do
     grabbed_components[i] = input_components[i]
@@ -97,10 +127,9 @@ end
 --Applys a system's function (func) to each entity that meets the systems signature, where entities_components
 --is a 2d table of entity_component tables, and ... is other required arguments
 --Only called inside new_system's closure
-local function run_system(func, entities_components, ...)
-  local args={...}
+local function run_system(func, entities_components, args)
   for i in pairs(entities_components) do
-    apply_system_to_entity(func, entities_components[i], unpack(args))
+    apply_system_to_entity(func, entities_components[i], args)
   end
 end
 --
@@ -154,7 +183,9 @@ local function check_entity_signature(get_entity_signature, signatures, max_comp
   local entity_signature = get_entity_signature(entity_id)
   --for each signature do a comparison
   local passed_one = false --keeps track if we passed even one signature
-  for i, signature in ipairs(signatures) do
+  --for i, signature in ipairs(signatures) do
+  for i=1, #signatures do
+    local signature = signatures[i]
     local passed_current=true --keeps track if we passed the current signature
     --compare each relevant entity-component flag to the system-signature
     for i, flag_check in pairs(signature) do
@@ -182,11 +213,12 @@ local function check_entity_signature(get_entity_signature, signatures, max_comp
   --if we did pass and the components arent in the system, add them
   if entities_index[entity_id] == nil then
     local input_components = {}
-    for i, component_id in ipairs(inputs) do
+    --for i, component_id in ipairs(inputs) do
+    for i=1, #inputs do
+      local component_id = inputs[i]
       input_components[i] = get_component(entity_id, component_id)
     end
-    table.insert(entities_components, #entities_components+1, input_components)
-
+    entities_components[#entities_components+1] = input_components
     entities_index[entity_id] = #entities_components
     reverse_entities_index[#entities_components] = entity_id
   end
@@ -194,9 +226,27 @@ local function check_entity_signature(get_entity_signature, signatures, max_comp
   return true
 end
 --
-function system_manager:new_system(get_entity_signature, max_components, get_component, ...)
+local function is_subset(a, b)
+    -- Iterate through all key-value pairs in table 'a'
+    if a==b then return true end
+    for k=1, #a do
+      local v = a[k]
+        local found = false
+        -- Check if the value associated with key 'k' is the same in both tables
+        for l=1, #b do
+          local w = b[l]
+          if w == v then
+            found = true
+            break
+          end
+        end
+        if not found then return false end
+    end
+    return true -- All key-value pairs in 'a' are found in 'b'
+end
+
+function system_manager:new_system(get_entity_signature, max_components, get_component, args)
   --Organizes the arguments passed to new_system by the user
-  local args={...}
   local flagged_components = nil
   local inputs = nil
   local func = nil
@@ -204,11 +254,40 @@ function system_manager:new_system(get_entity_signature, max_components, get_com
     flagged_components = args[1]
     inputs = args[1]
     func = args[2]
-  else
+    for i=1, #inputs do
+      local component_id = inputs[i]
+      if type(component_id) ~= "number" or component_id < 1 then
+        error("new_system(): argument 2, entry "..tostring(i)..", expected component_id but got "..tostring(component_id), 2)
+      end
+    end
+  elseif #args == 3 then
     flagged_components = args[1]
     inputs = args[2]
     func = args[3]
+    if type(inputs) ~= "table" then error("new_system(): argument 2 expected table but got "..type(inputs), 2) end
+    if not (#inputs > 0) then error("new_system(): argument 2 input_table cannot be empty", 2) end
+    for i=1, #inputs do
+      local component_id = inputs[i]
+      if type(component_id) ~= "number" or component_id > max_components or
+            component_id < 1 or math.floor(component_id) ~= component_id then
+        error("new_system(): argument 2, entry "..tostring(i)..", expected component_id but got "..tostring(component_id), 2)
+      end
+    end
+    if not no_repeats(inputs) then error("new_system(): argument 2 input_table cannot have repeat component_ids", 2) end
+  else
+    error("new_system(): requires 2 or 3 arguments but got "..tostring(#args), 2)
   end
+  
+  --Currently not checking flagged components correctly for multi signature system
+  if not (type(flagged_components) == "table") then error("new_system(): argument 1 expected table but got "..type(flagged_components), 2) end
+  if not (#flagged_components > 0) then error("new_system(): argument 1 signature_tables cannot be empty", 2) end
+  if not (type(func) == "function") then error("new_system(): argument "..tostring(#args)..
+      " expected function but got "..type(func), 2) end
+  if not (debug.getinfo(func, "u").nparams >= #inputs) then
+    error("new_system(): argument "..tostring(#args)..
+      " must has at least as many inputs as entries in argument "..tostring(#args-1).." input_table", 2)
+  end
+  
   
   --[system_name]{index->{bool_func}}
   --holds all the combinations of components and entity can or can't have to be itterated by each system
@@ -216,11 +295,22 @@ function system_manager:new_system(get_entity_signature, max_components, get_com
   
   --Composes the signature or signatures from flagged_components
   if type(flagged_components[1])=="number" then
+    if not is_subset(inputs, flagged_components) then
+      error("new_system(): argument 2 input table must be a subset of all argument 1 signature tables", 2)
+    end
     signatures = {compose_signature(flagged_components, max_components)}
   else
     signatures = {}
-    for i, signature_text in ipairs(flagged_components) do
-      table.insert(signatures, compose_signature(signature_text), max_components)
+    --for i, signature_text in ipairs(flagged_components) do
+    for i=1, #flagged_components do
+      local signature_text = flagged_components[i]
+      if type(signature_text) ~= "table" then
+        error("new_system(): argument 1 entry "..tostring(i).." table expected but got "..type(signature_text), 2)
+      end
+      if not is_subset(inputs, signature_text) then
+        error("new_system(): argument 2 input table must be a subset of all argument 1 signature tables", 2)
+      end
+    signatures[i] = compose_signature(signature_text, max_components)
     end
   end
   flagged_components = nil
@@ -242,12 +332,14 @@ function system_manager:new_system(get_entity_signature, max_components, get_com
   table.insert(systems_print_array, to_print)
 
   --Adds custom check_entity function to systems global array
-  systems_global_array[#systems_global_array+1] = function(entity_id) 
+  local Lsystems_global_array = systems_global_array
+  Lsystems_global_array[#Lsystems_global_array+1] = function(entity_id) 
       return check_entity_signature(get_entity_signature, signatures, max_components, entities_index, 
         reverse_entities_index, entities_components, inputs, entity_id) 
     end
   --Adds custom removal function to systems delete array
-  systems_delete_array[#systems_delete_array+1] = remove_maker(entities_components, entities_index, 
+  local Lsystems_delete_array = systems_delete_array
+  Lsystems_delete_array[#Lsystems_delete_array+1] = remove_maker(entities_components, entities_index, 
     reverse_entities_index)
   --Sets the system id and creates the system update array
   local system_id = #systems_global_array
@@ -255,42 +347,53 @@ function system_manager:new_system(get_entity_signature, max_components, get_com
   
   return  function(...)
             --if already inside a system when starting new system, error and fail
-            if system_flag~=nil then 
-              love.errorhandler("Attempted to enter system "..tostring(system_id).." while already in system "
-                ..tostring(system_flag))
-              love.event.quit(0)
-            else system_flag = system_id end
+            if system_flag~=nil then
+              error("Attempted to enter system "..tostring(system_id).." while already in system "..tostring(system_flag), 2)
+            end
+            system_flag = system_id
             
             local args2 = {...}
             
             --Check every entity against system signatures that is in system update array
-            for entity_id in pairs(systems_update_arrays[system_id]) do
-              systems_global_array[system_id](entity_id)
+            local Lsystems_update_arrays = systems_update_arrays
+            for entity_id in pairs(Lsystems_update_arrays[system_id]) do
+              Lsystems_global_array[system_id](entity_id)
             end
-            systems_update_arrays[system_id] = {}
+            Lsystems_update_arrays[system_id] = {}
             
             --Perform every function stored in before system array
-            for i, before in ipairs(before_system_array) do
-              before[1](unpack(before[2]))
+            local Lbefore_system_array = before_system_array
+            for i=1, #Lbefore_system_array do
+              local before = Lbefore_system_array[i]
+              local success, msg = pcall(before[1], unpack(before[2]))
+              if not success then
+                error(before[3].short_src..": "..before[3].currentline..": before_next_system(): "..msg, -1)
+              end
             end
             before_system_array = {}
+            
             --run the system on each enttiy in the system's registry
-            run_system(func, entities_components, unpack(args2))
+            run_system(func, entities_components, args2)
             system_flag = nil
             
             --remove or delete each component or entity that was slated to be during system run
-            for i, deletion in ipairs(to_be_deleted) do
+            for i=1, #to_be_deleted do
+              local deletion = to_be_deleted[i]
               deletion[1](unpack(deletion[2]))
             end
             to_be_deleted = {}
             
             --Perform every function stored in after system array
-            for i, after in ipairs(after_system_array) do
-              after[1](unpack(after[2]))
+            for i=1, #after_system_array do
+              local after = after_system_array[i]
+              local success, msg = pcall(after[1], unpack(after[2]))
+              if not success then
+                error(after[3].short_src..": "..after[3].currentline..": after_system(): "..msg, -1)
+              end
             end
             after_system_array = {}
             
-          end
+          end, system_id
 end
 
 --
