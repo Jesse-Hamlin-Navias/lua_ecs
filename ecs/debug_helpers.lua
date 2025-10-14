@@ -1,5 +1,5 @@
 function printTable(t, ...)
-    local args={...}
+    local args=table.pack(...)
     local spacing = ""
     if #args==1 then spacing = args[1] end
     

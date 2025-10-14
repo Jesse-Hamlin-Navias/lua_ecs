@@ -8,6 +8,7 @@ local system_flag = nil
 local after_system_array = {}
 local before_system_array = {}
 local to_be_deleted = {}
+local continue = true
 
 --Returns the current system id being run or nil if none
 function system_manager:get_system_flag()
@@ -85,9 +86,9 @@ end
 local function compose_signature(components, max_components)
   local signature = {}
   if not no_repeats(components) then error("new_system(): argument 1 signature_tables cannot have repeat component_ids", 3) end
-  for i, component_id in ipairs(components) do
+  for i=1, #components do
     --if a component_type is listed in components, and is set as -1,
-
+    local component_id = components[i]
     if type(component_id) ~= "number" or math.abs(component_id) > max_components or 
     component_id==0 or math.floor(component_id) ~= component_id then
       error("new_system() argument 1, entry "..tostring(i)..", expected component_id but got "..tostring(component_id), 3)
@@ -106,6 +107,13 @@ local function compose_signature(components, max_components)
   end
   
   return signature
+end
+
+function system_manager:end_system()
+  if system_flag == nil then
+    error("end_system(): Cannot be called while not in a system", 3)
+  end
+  continue = false
 end
 --
 --Apply a systems function (func) onto an entity + extra arguments, where input_components is a table of
@@ -129,7 +137,8 @@ end
 --Only called inside new_system's closure
 local function run_system(func, entities_components, args)
   for i in pairs(entities_components) do
-    apply_system_to_entity(func, entities_components[i], args)
+    if continue then apply_system_to_entity(func, entities_components[i], args) 
+    else continue = true break end
   end
 end
 --
@@ -250,21 +259,25 @@ function system_manager:new_system(get_entity_signature, max_components, get_com
   local flagged_components = nil
   local inputs = nil
   local func = nil
-  if #args == 2 then
+  if args.n == 2 then
     flagged_components = args[1]
     inputs = args[1]
     func = args[2]
+    if type(inputs) ~= "table" then error("new_system(): argument 1 expected table but got "..type(inputs), 2) end
     for i=1, #inputs do
       local component_id = inputs[i]
       if type(component_id) ~= "number" or component_id < 1 then
         error("new_system(): argument 2, entry "..tostring(i)..", expected component_id but got "..tostring(component_id), 2)
       end
     end
-  elseif #args == 3 then
+  elseif args.n == 3 then
     flagged_components = args[1]
     inputs = args[2]
     func = args[3]
+    if type(flagged_components) ~= "table" then error("new_system(): argument 1 expected table but got "..type(flagged_components), 2) end
     if type(inputs) ~= "table" then error("new_system(): argument 2 expected table but got "..type(inputs), 2) end
+    flagged_components = table.pack(unpack(flagged_components))
+    inputs = table.pack(unpack(inputs))
     if not (#inputs > 0) then error("new_system(): argument 2 input_table cannot be empty", 2) end
     for i=1, #inputs do
       local component_id = inputs[i]
@@ -279,7 +292,6 @@ function system_manager:new_system(get_entity_signature, max_components, get_com
   end
   
   --Currently not checking flagged components correctly for multi signature system
-  if not (type(flagged_components) == "table") then error("new_system(): argument 1 expected table but got "..type(flagged_components), 2) end
   if not (#flagged_components > 0) then error("new_system(): argument 1 signature_tables cannot be empty", 2) end
   if not (type(func) == "function") then error("new_system(): argument "..tostring(#args)..
       " expected function but got "..type(func), 2) end

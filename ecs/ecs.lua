@@ -92,7 +92,7 @@ function new_component_type(...)
 end
 
 function new_component_type_with_transform(...)
-  local args = {...}
+  local args = table.pack(...)
   return c:new_component_type_with_transform(args)
 end
 
@@ -107,8 +107,12 @@ function add_component(entity_id, component_id, ...)
 end
 
 function new_system(...)
-  local args = {...}
+  local args = table.pack(...)
   return s:new_system(get_entity_signature, get_max_components(), get_component, args)
+end
+
+function end_system()
+  s:end_system()
 end
 
 function print_ecs()

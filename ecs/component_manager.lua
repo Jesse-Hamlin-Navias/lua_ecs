@@ -74,6 +74,13 @@ end
 function component_manager:new_component_type_with_transform(args)
   max_components = max_components+1
   
+  for i=1, args.n do
+    local arg = args[i]
+    if type(arg) == "nil" then
+      error("new_component_type_with_transform(): argument "..tostring(i).." is nil", 2)
+    end
+  end
+  
   --if a custom function is defined for component's table generation, use that
   if #args==1 then
     if type(args[1]) ~= "function" then
@@ -92,6 +99,13 @@ function component_manager:new_component_type_with_transform(args)
     elseif type(transform_table) ~= "table" then
       error("add_component_with_transform(): argument 2 expected table but got "..type(transform_table), 2)
     end
+    component_table = table.pack(unpack(component_table))
+    for i=1, component_table.n do
+    local arg = component_table[i]
+    if type(arg) == "nil" then
+      error("new_component_type_with_transform(): argument 1, entry "..tostring(i).." is nil", 2)
+    end
+  end
     for i, func in pairs(transform_table) do
       if type(func) == "function" then
         if debug.getinfo(func, "u").nparams ~= 1 then
