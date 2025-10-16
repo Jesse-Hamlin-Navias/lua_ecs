@@ -23,29 +23,31 @@ function entity_manager:set_entity_max(new_max)
     error("set_entity_max(): argument 1 expected a real number but got "..tostring(new_max), 3)
   end
   
+  local Lentity_max = entity_max
+  local Ldelete_save = delete_save
   if new_max < checked_count then
     error("Cannot set max entities ("..tostring(new_max)..") less than current entities ("..
       tostring(entity_count)..")", 3)
-  elseif new_max < entity_max then
+  elseif new_max < Lentity_max then
     table.sort(id_queue)
-    local difference = entity_max - new_max
+    local difference = Lentity_max - new_max
     
     for i=1, difference do
-      if id_queue[#id_queue] ~= entity_max+1-i then
-        delete_save[#delete_save+1] = id_queue[#id_queue]
+      if id_queue[#id_queue] ~= Lentity_max+1-i then
+        delete_save[#Ldelete_save+1] = id_queue[#id_queue]
       end
       id_queue[#id_queue] = nil
     end
     
     table.sort(delete_save, function(a, b) return a > b end)
   else
-    local difference = new_max - entity_max
+    local difference = new_max - Lentity_max
     for i=1, difference do
-      if #delete_save > 0 then
-        id_queue[#id_queue+1] = delete_save[#delete_save]
-        delete_save[#delete_save] = nil
+      if #Ldelete_save > 0 then
+        id_queue[#id_queue+1] = Ldelete_save[#Ldelete_save]
+        delete_save[#Ldelete_save] = nil
       else
-        id_queue[#id_queue+1] = entity_max+i
+        id_queue[#id_queue+1] = Lentity_max+i
       end
     end
     
@@ -109,7 +111,7 @@ function entity_manager:delete_entity(entity_id, delete_component)
     end
   end
   
-  table.insert(id_queue, entity_id)
+  id_queue[#id_queue+1] = entity_id
   checked_count = checked_count-1
   sig=nil
 end
