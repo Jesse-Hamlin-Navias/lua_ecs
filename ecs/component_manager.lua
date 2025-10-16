@@ -42,7 +42,7 @@ function component_manager:new_component_type(component_table)
   --If no data is defined for component, define only the entity
   if #component_table==0 then
     local constructor = function(id) return {entity=id} end
-    table.insert(components, constructor)
+    components[#components+1] = constructor
   --if a custom function is defined for component's table generation, use that
   else
     local constructor = function (id, ...)
@@ -61,11 +61,11 @@ function component_manager:new_component_type(component_table)
                           return returned_component
                         end
 
-    table.insert(components, constructor)
+    components[#components+1] = constructor
   end
   --Create new component storage and entity->index map at the component types id index
-  table.insert(component_arrays, {})
-  table.insert(entity_to_component_index, {})
+  component_arrays[#component_arrays+1] = {}
+  entity_to_component_index[#entity_to_component_index+1] = {}
   return max_components
 end
 
@@ -89,7 +89,7 @@ function component_manager:new_component_type_with_transform(args)
     if debug.getinfo(args[1], "u").nparams < 1 then
       error("new_component_type_with_transform(): argument 1 function must take at least 1 argument", 2)
     end
-    table.insert(components, args[1])
+    components[#components+1] = args[1]
   --if a data table and input->data conversion table is defined, compose those + entity=arg1
   elseif #args==2 then
     local component_table=args[1]
@@ -99,6 +99,7 @@ function component_manager:new_component_type_with_transform(args)
     elseif type(transform_table) ~= "table" then
       error("add_component_with_transform(): argument 2 expected table but got "..type(transform_table), 2)
     end
+    --This might not work PROBLEM
     component_table = table.pack(unpack(component_table))
     for i=1, component_table.n do
     local arg = component_table[i]
@@ -156,9 +157,10 @@ function component_manager:add_component(entity_id, component_id, update_entity_
   
   local component = components[component_id](entity_id, unpack(arg))
   --adds new component to end of corresponding component array
-  table.insert(component_arrays[component_id], component)
+  local Lcomponent_array = component_arrays[component_id]
+  table.insert(Lcomponent_array, component)
   --adds map of entity_id->index
-  table.insert(entity_to_component_index[component_id], entity_id, #component_arrays[component_id])
+  table.insert(entity_to_component_index[component_id], entity_id, #Lcomponent_array)
   
   --adds the component to the entitie's signature
   update_entity_signature(entity_id, component_id, true)
@@ -192,20 +194,21 @@ function component_manager:ititerate_component(component_id, args)
   if component_array == nil then
     error("components(): argument 1 expected component_id but got "..tostring(component_id), 2)
   end
-  for i=1, #args do
+  for i=1, args.n do
     local arg = args[i]
     if type(arg) ~= "number" or arg < 0 or arg > max_components or math.floor(arg) ~= arg then
       error("components(): argument "..tostring(i+1).." expected component_id but got "..tostring(arg), 2)
     end
   end
-  local n = table.getn(component_arrays[component_id])
+  local n = table.getn(component_array)
   return  function()
             i = i + 1
             if i <= n then 
-              local component = component_arrays[component_id][i]
+              local component = component_array[i]
               local all_components = {component}
               local has_all_types = true
-              for j, component_type in ipairs(args) do
+              for j=1, args.n do
+                local component_type = args[i]
                 local component_2 = get_component(component.entity, component_type)
                 if component_2 then
                   all_components[#all_components+1] = component_2

@@ -38,8 +38,8 @@ end
 --
 
 function delete_component(entity_id, component_id)
-  for i, array in ipairs(s:get_systems_update_arrays()) do
-      array[entity_id] = true
+  for i=1, #s:get_systems_update_arrays() do
+      s:get_systems_update_arrays()[i][entity_id] = true
   end
   
   if s:get_system_flag()==nil then
@@ -57,14 +57,14 @@ function new_entity()
 end
 
 function delete_entity(entity_id)
-  for i, array in ipairs(s:get_systems_update_arrays()) do
-    array[entity_id] = nil
+  for i=1, #s:get_systems_update_arrays() do
+    s:get_systems_update_arrays()[i][entity_id] = nil
   end
 
   if s:get_system_flag()==nil then
     s:delete_entity(entity_id)
     e:delete_entity(entity_id, c_delete_component)
-else
+  else
     s:delete_after_system(s.delete_entity, {s, entity_id})
     s:delete_after_system(e.delete_entity, {e, entity_id, c_delete_component})
   end
@@ -99,8 +99,8 @@ end
 function add_component(entity_id, component_id, ...)
   local args = {...}
   
-  for i, array in ipairs(s:get_systems_update_arrays()) do
-    array[entity_id] = true
+  for i=1, #s:get_systems_update_arrays() do
+    s:get_systems_update_arrays()[i][entity_id] = true
   end
   
   return c:add_component(entity_id, component_id, update_entity_signature, args)
@@ -135,6 +135,6 @@ function print_entity(entity_id)
 end
 
 function components(component_id, ...)
-  local args = {...}
+  local args = table.pack(...)
   return c:ititerate_component(component_id, args)
 end
