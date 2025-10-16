@@ -119,7 +119,6 @@ function print_ecs()
   e:print_entities()
   print("--------------")
   c:print_all_components()
-  print("--------------")
   s:print_all_systems()
 end
 

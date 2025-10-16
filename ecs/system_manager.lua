@@ -52,7 +52,7 @@ function system_manager:print_system(i)
     error("print_system(): argument 1 expected system_id but got "..tostring(i), 3)
   end
   print("System "..tostring(i)..":")
-  for key, value in pairs(systems_print_array[i]) do
+  for key, value in pairs(system_print_array) do
     io.write(key..":")
     if type(value) == "table" then
       printTable(value)
@@ -62,11 +62,9 @@ end
 --
 --Prints every system's info
 function system_manager:print_all_systems()
-  for i, system in ipairs(systems_print_array) do
-    system_manager:print_system(i)
-    if i~=#systems_print_array then
-      print("----------------")
-    end
+  for i=1, #systems_print_array do
+    print("----------------")
+    print_system(i)
   end
 end
 --
@@ -96,13 +94,11 @@ local function compose_signature(components, max_components)
     
     if component_id<0 then
       --then create a boolean function that inverts its boolean input
-      table.insert(signature, component_id*-1, 
-      function (flag) return not flag end) 
+      table.insert(signature, component_id*-1, function (flag) return not flag end) 
     else
       --Otherwise if the component_type is listed in components, and is set as 1,
       --the create a boolean function that returns the inputed boolean
-      table.insert(signature, component_id, 
-        function (flag) return flag end) 
+      table.insert(signature, component_id, function (flag) return flag end) 
     end
   end
   
@@ -122,10 +118,10 @@ end
 local function apply_system_to_entity(func, input_components, args)
   --This concatonates input_components followed by all other arguments into one table
   local grabbed_components = {}
-  for i, component in ipairs(input_components) do
+  for i=1, #input_components do
     grabbed_components[i] = input_components[i]
   end
-  for i=1,#args do
+  for i=1, #args do
     grabbed_components[#grabbed_components+1] = args[i]
   end
   --apply the system's function onto input_components and ...
@@ -354,8 +350,9 @@ function system_manager:new_system(get_entity_signature, max_components, get_com
   Lsystems_delete_array[#Lsystems_delete_array+1] = remove_maker(entities_components, entities_index, 
     reverse_entities_index)
   --Sets the system id and creates the system update array
-  local system_id = #systems_global_array
-  systems_update_arrays[system_id] = {}
+  local system_id = #Lsystems_global_array
+  local Lsystems_update_arrays = systems_update_arrays
+  Lsystems_update_arrays[system_id] = {}
   
   return  function(...)
             --if already inside a system when starting new system, error and fail
@@ -367,7 +364,6 @@ function system_manager:new_system(get_entity_signature, max_components, get_com
             local args2 = {...}
             
             --Check every entity against system signatures that is in system update array
-            local Lsystems_update_arrays = systems_update_arrays
             for entity_id in pairs(Lsystems_update_arrays[system_id]) do
               Lsystems_global_array[system_id](entity_id)
             end
@@ -389,15 +385,17 @@ function system_manager:new_system(get_entity_signature, max_components, get_com
             system_flag = nil
             
             --remove or delete each component or entity that was slated to be during system run
-            for i=1, #to_be_deleted do
-              local deletion = to_be_deleted[i]
+            local Lto_be_deleted = to_be_deleted
+            for i=1, #Lto_be_deleted do
+              local deletion = Lto_be_deleted[i]
               deletion[1](unpack(deletion[2]))
             end
             to_be_deleted = {}
             
             --Perform every function stored in after system array
-            for i=1, #after_system_array do
-              local after = after_system_array[i]
+            local Lafter_system_array = after_system_array
+            for i=1, #Lafter_system_array do
+              local after = Lafter_system_array[i]
               local success, msg = pcall(after[1], unpack(after[2]))
               if not success then
                 error(after[3].short_src..": "..after[3].currentline..": after_system(): "..msg, -1)

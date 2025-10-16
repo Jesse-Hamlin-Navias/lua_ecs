@@ -192,7 +192,8 @@ function component_manager:ititerate_component(component_id, args)
   if component_array == nil then
     error("components(): argument 1 expected component_id but got "..tostring(component_id), 2)
   end
-  for i, arg in ipairs(args) do
+  for i=1, #args do
+    local arg = args[i]
     if type(arg) ~= "number" or arg < 0 or arg > max_components or math.floor(arg) ~= arg then
       error("components(): argument "..tostring(i+1).." expected component_id but got "..tostring(arg), 2)
     end

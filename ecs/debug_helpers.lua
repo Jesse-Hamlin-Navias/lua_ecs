@@ -1,7 +1,7 @@
 function printTable(t, ...)
     local args=table.pack(...)
     local spacing = ""
-    if #args==1 then spacing = args[1] end
+    if args.n==1 then spacing = args[1] end
     
     local has_subtable = false
     for k, v in pairs(t) do
@@ -16,7 +16,6 @@ function printTable(t, ...)
       for k, v in pairs(t) do
           io.write(spacing.."  [" .. tostring(k) .. "] = ")
           if type(v) == "table" then
-              has_subtable = true
               printTable(v, spacing.."  ") -- Recursively call for nested tables
           else
               print(tostring(v) .. ",")
