@@ -134,7 +134,7 @@ function print_entity(entity_id)
   e:print_entity(entity_id)
 end
 
-function components(component_id, ...)
+function components(...)
   local args = table.pack(...)
-  return c:ititerate_component(component_id, args)
+  return c:ititerate_component(args, e.get_entity_signature, e)
 end

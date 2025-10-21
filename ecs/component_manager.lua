@@ -188,37 +188,66 @@ function component_manager:delete_component(entity_id, component_id)
 end
 --
 --Applies function func to all components of the specified type. Order not garunteed.
-function component_manager:ititerate_component(component_id, args)
-  local i = 0
-  local component_array = component_arrays[component_id]
-  if component_array == nil then
-    error("components(): argument 1 expected component_id but got "..tostring(component_id), 2)
-  end
+function component_manager:ititerate_component(args, get_entity_signature, e)
+  local one_positive = false
+  local split = nil
+  table.sort(args)
   for i=1, args.n do
     local arg = args[i]
-    if type(arg) ~= "number" or arg < 0 or arg > max_components or math.floor(arg) ~= arg then
+    if type(arg) ~= "number" or arg == 0 or math.abs(arg) > max_components or math.floor(arg) ~= arg then
       error("components(): argument "..tostring(i+1).." expected component_id but got "..tostring(arg), 2)
     end
+    if arg > 0 and not split then
+      one_positive = true
+      split = i
+    end
   end
-  local n = table.getn(component_array)
+  if not one_positive then error("components(): requires one positive component_id argument", 2) end
+  
+  local i = 0
+  local component_array = component_arrays[args[split]]
+  local n = #component_array
+  local base = split
+  for j = split+1, args.n do
+    local temp_ca = component_arrays[args[j]]
+    local temp_n = #temp_ca
+    if temp_n < n then
+      component_array = temp_ca
+      n = temp_n
+      base = j
+    end
+  end
+  table.remove(args, base)
+  
   return  function()
             i = i + 1
-            if i <= n then 
+            while i <= n do 
               local component = component_array[i]
               local all_components = {component}
               local has_all_types = true
-              for j=1, args.n do
-                local component_type = args[i]
-                local component_2 = get_component(component.entity, component_type)
-                if component_2 then
-                  all_components[#all_components+1] = component_2
-                else
+              local sig = get_entity_signature(e, component.entity)
+              for j=1, split-1 do
+                local component_type = args[j]
+                if sig[math.abs(component_type)] then
                   has_all_types = false
                   break
                 end
               end
+              if has_all_types then
+                for j=split, #args do
+                  local component_type = args[j]
+                  if sig[component_type] then
+                    all_components[#all_components+1] = get_component(component.entity, component_type)
+                  else
+                    has_all_types = false
+                    break
+                  end
+                end
+              end
               if has_all_types then return unpack(all_components) end
+              i = i + 1
             end
+            return nil
           end
 end
 --
