@@ -172,8 +172,10 @@ end
 function component_manager:get_component(entity_id, component_id)
   --Of all components, go to the array type matching component_type.
   --  In that array, use entity_id->index to retrieve the component.
-  assert(component_id > 0 and component_id <= max_components, 
-    "get_component(): expected a component_id but got "..tostring(component_id).." instead")
+  if type(component_id) ~= "number" or math.floor(component_id) ~= component_id or
+    component_id <= 0 or component_id > max_components then
+    error("get_component(): expected a component_id but got "..tostring(component_id).." instead", 2)
+  end
   return component_arrays[component_id][entity_to_component_index[component_id][entity_id]]
 end
 --
